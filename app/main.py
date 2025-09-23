@@ -12,7 +12,7 @@ from .api.v1.endpoints import component_status, programs, daily_production, oper
 from .routes import hr_routes, finance_routes, master_order_routes
 from .api.v1.endpoints import document_management, inventoryv1, priority_scheduling,mttr_mtbf
 from .api.v1.endpoints import component_status, programs, daily_production, operator_login, toolsprograms,notification_service
-from .api.v1.endpoints import auth, planning, mpp, operations, scheduled, scheduled2,  dynamic_rescheduling, comp_maintainance, comp_operator, document_management_v2, production_monitoring, production_logs,quality, document_management, energymonitoring, newlogs, operatorlog2
+from .api.v1.endpoints import auth, planning, mpp, operations, scheduled, scheduled2,  dynamic_rescheduling, comp_maintainance, comp_operator, document_management_v2, production_monitoring, production_logs,quality, document_management, energymonitoring, newlogs, operatorlog2, dynamic_schedule
 from .api.v1.endpoints import notification_service,simple_notifications
 
 
@@ -57,6 +57,7 @@ app.include_router(operatorlog2.router)
 app.include_router(production_logs.router)
 app.include_router(priority_scheduling.router)
 app.include_router(dynamic_rescheduling.router)
+app.include_router(dynamic_schedule.router)
 app.include_router(programs.router)
 app.include_router(quality.router)
 app.include_router(notification_service.router)
@@ -66,6 +67,7 @@ app.include_router(daily_production.router)
 app.include_router(inventoryv1.router)
 app.include_router(mttr_mtbf.router)
 app.include_router(energymonitoring.router)
+
 
 
 #######
@@ -134,3 +136,5 @@ def read_root():
 # uvicorn app.main:app --host 172.18.7.88 --port 2929 --reload
 # uvicorn app.main:app --host 172.18.7.88 --port 2277 --reload
 # uvicorn app.main:app --host 172.18.7.88 --port 8888 --reload
+
+# uvicorn app.main:app --host 172.18.100.67 --port 9865 --reload

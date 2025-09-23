@@ -40,6 +40,7 @@ class Machine(db.Entity):
     credential = Optional('MachineCredential', reverse='machine', cascade_delete=True)
     notification = Set('MachineCalibrationLog')
     planned_items = Set('PlannedItem')
+    rescheduled_items = Set('RescheduledItem')
 
 
 class MachineShift(db.Entity):
@@ -75,7 +76,7 @@ class MachineStatus(db.Entity):
     status = Required(Status)
     description = Optional(str)
     available_from = Optional(datetime)  # Start of status period
-    available_to = Optional(datetime)    # ⬅️ NEW: End of status period (needed for range checking)
+    available_to = Optional(datetime)    # â¬…ï¸ NEW: End of status period (needed for range checking)
 
 
 
@@ -117,6 +118,7 @@ class Order(db.Entity):
     order_completed = Set('OrderCompleted', reverse='order_id')
     planned_items = Set('PlannedItem')
     pdc_records = Set('PDC', reverse='order_id')
+    rescheduled_items = Set('RescheduledItem')
 
 
 
@@ -144,6 +146,7 @@ class Operation(db.Entity):
     machine_raw_2 = Set('MachineRaw', reverse='actual_job')
     inventory_requests = Set("InventoryRequest")
     planned_items = Set('PlannedItem')
+    rescheduled_items = Set('RescheduledItem')
 
 
 class ProcessPlan(db.Entity):

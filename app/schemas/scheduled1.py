@@ -8,6 +8,7 @@ from app.schemas.operations import WorkCenterMachine
 class PartStatusUpdate(BaseModel):
     status: str
 
+
 class PartScheduleStartDateResponse(BaseModel):
     start_date: Optional[datetime]
 
@@ -22,9 +23,11 @@ class ScheduledOperation(BaseModel):
     quantity: str
     production_order: Optional[str]
 
+
 class DailyProduction(BaseModel):
     date: datetime
     quantity: int
+
 
 class ComponentStatus(BaseModel):
     scheduled_end_time: Optional[datetime]
@@ -33,11 +36,13 @@ class ComponentStatus(BaseModel):
     completed_quantity: int
     total_quantity: int
 
+
 class MachineInfo(BaseModel):
     id: str
     name: str
     model: str
     type: str
+
 
 class WorkCenterInfo(BaseModel):
     work_center_code: str
@@ -60,15 +65,16 @@ class ProductionLogResponse(BaseModel):
     id: int
     operator_id: int
     start_time: Optional[datetime]  # Made optional
-    end_time: Optional[datetime]    # Made optional
+    end_time: Optional[datetime]  # Made optional
     quantity_completed: int
     quantity_rejected: int
-    part_number: Optional[str]      # Made optional
+    part_number: Optional[str]  # Made optional
     production_order: Optional[str]
     operation_description: Optional[str]  # Made optional
-    machine_name: Optional[str]     # Made optional
+    machine_name: Optional[str]  # Made optional
     notes: Optional[str]
-    version_number: Optional[int]   # Made optional
+    version_number: Optional[int]  # Made optional
+
 
 class ProductionLogsResponse(BaseModel):
     production_logs: List[ProductionLogResponse]
@@ -80,6 +86,7 @@ class ProductionLogsResponse(BaseModel):
 class CombinedScheduleProductionResponse(BaseModel):
     production_logs: List[ProductionLogResponse]
     scheduled_operations: List[ScheduledOperation]
+
 
 class RescheduleUpdate(BaseModel):
     operation_id: int
@@ -96,6 +103,7 @@ class RescheduleUpdate(BaseModel):
     part_number: str
     production_order: str
 
+
 class CombinedScheduleResponse(BaseModel):
     reschedule: List[RescheduleUpdate]  # Changed from updates to reschedule
     total_updates: int
@@ -109,6 +117,7 @@ class CombinedScheduleResponse(BaseModel):
     total_logs: int
     work_centers: List[WorkCenterInfo]
 
+
 class PartProductionTimeline(BaseModel):
     part_number: str
     production_order: str
@@ -116,9 +125,11 @@ class PartProductionTimeline(BaseModel):
     operations_count: int
     status: Optional[str]
 
+
 class PartProductionResponse(BaseModel):
     items: List[PartProductionTimeline]
     total_parts: int
+
 
 class MachineUtilization(BaseModel):
     """Response model for machine utilization data"""
@@ -169,7 +180,6 @@ class OrderCompletionRecord(BaseModel):
 
 class AllCompletionStatusResponse(BaseModel):
     completion_records: List[OrderCompletionRecord]
-
 
 
 # PDC (Production Data Collection) Schemas
@@ -228,7 +238,8 @@ class PDCFilter(BaseModel):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     order_id: Optional[int] = None
-    
+
+
 class ScheduleHistoryBase(BaseModel):
     """Base schema for schedule history"""
     version: int
@@ -308,3 +319,63 @@ class PlannedScheduleItemList(BaseModel):
     """Schema for list of planned schedule items"""
     planned_schedule_items: List[PlannedScheduleItemResponse]
     total_count: int
+
+
+# RescheduledItem Schemas
+class RescheduledItemBase(BaseModel):
+    """Base schema for rescheduled items"""
+    order_id: int
+    operation_id: int
+    machine_id: int
+    start_time: datetime
+    end_time: datetime
+    total_qty: int
+    completed_qty: int = 0
+    remaining_qty: int
+    status: Optional[str] = None
+    type: Optional[str] = None
+
+
+class RescheduledItemCreate(RescheduledItemBase):
+    """Schema for creating a new rescheduled item"""
+    pass
+
+
+class RescheduledItemUpdate(BaseModel):
+    """Schema for updating a rescheduled item"""
+    order_id: Optional[int] = None
+    operation_id: Optional[int] = None
+    machine_id: Optional[int] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    total_qty: Optional[int] = None
+    completed_qty: Optional[int] = None
+    remaining_qty: Optional[int] = None
+    status: Optional[str] = None
+    type: Optional[str] = None
+
+
+class RescheduledItemResponse(RescheduledItemBase):
+    """Schema for rescheduled item response"""
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RescheduledItemList(BaseModel):
+    """Schema for list of rescheduled items"""
+    rescheduled_items: List[RescheduledItemResponse]
+    total_count: int
+
+
+class RescheduledItemFilter(BaseModel):
+    """Schema for filtering rescheduled items"""
+    order_id: Optional[int] = None
+    operation_id: Optional[int] = None
+    machine_id: Optional[int] = None
+    status: Optional[str] = None
+    type: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None

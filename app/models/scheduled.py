@@ -1,6 +1,7 @@
 from datetime import datetime
 from pony.orm import *
-from . import User, Order, Operation, Machine
+from .user import User
+from .master_order import Order, Operation, Machine
 from ..database.connection import db
 
 class ScheduleHistory(db.Entity):
@@ -23,7 +24,6 @@ class PartScheduleStatus(db.Entity):
     created_at = Required(datetime, default=datetime.utcnow)
     updated_at = Required(datetime, default=datetime.utcnow)
 
-    
 
 class PlannedScheduleItem(db.Entity):
     """Stores the actual schedule results"""
@@ -100,4 +100,21 @@ class PlannedItem(db.Entity):
     remaining_quantity = Required(int)
     status = Optional(str)
     current_version = Optional(int)
+    created_at = Required(datetime, default=datetime.utcnow)
+
+
+class RescheduledItem(db.Entity):
+    """Stores the rescheduled_items table"""
+    _table_ = ("scheduling", "rescheduled_items")
+    id = PrimaryKey(int, auto=True)
+    order = Required(Order, reverse='rescheduled_items', column='order_id')
+    operation = Required(Operation, reverse='rescheduled_items', column='operation_id')
+    machine = Required(Machine, reverse='rescheduled_items', column='machine_id')
+    start_time = Required(datetime)
+    end_time = Required(datetime)
+    total_qty = Required(int)
+    completed_qty = Required(int, default=0)
+    remaining_qty = Required(int)
+    status = Optional(str)
+    type = Optional(str)
     created_at = Required(datetime, default=datetime.utcnow)
