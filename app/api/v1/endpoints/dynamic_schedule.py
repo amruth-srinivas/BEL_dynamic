@@ -131,13 +131,13 @@ def copy_scheduled_to_rescheduled_items() -> int:
         with db_session:
             # Get all scheduled items
             scheduled_items = select(ri for ri in RescheduledItem if ri.status == 'scheduled')[:]
-            
+
             if not scheduled_items:
                 print("No scheduled items found to copy")
                 return 0
-            
+
             items_copied = 0
-            
+
             for item in scheduled_items:
                 try:
                     # Create a rescheduled item with the same timestamps
@@ -154,16 +154,17 @@ def copy_scheduled_to_rescheduled_items() -> int:
                         type=item.type  # Keep same type (setup/cycle)
                     )
                     items_copied += 1
-                    print(f"Copied scheduled item: {item.operation.operation_description} ({item.type}) - {item.start_time} -> {item.end_time}")
-                    
+                    print(
+                        f"Copied scheduled item: {item.operation.operation_description} ({item.type}) - {item.start_time} -> {item.end_time}")
+
                 except Exception as e:
                     print(f"Error copying scheduled item {item.id}: {e}")
                     continue
-            
+
             commit()
             print(f"Successfully copied {items_copied} scheduled items to rescheduled items")
             return items_copied
-            
+
     except Exception as e:
         print(f"Error copying scheduled to rescheduled items: {e}")
         return 0
@@ -180,7 +181,8 @@ def purge_rescheduled_items_for_orders(order_ids: set, machine_id: Optional[int]
                 query = query.filter(lambda ri: ri.machine.id == machine_id)
             count = query.count()
             if count:
-                print(f"Purging {count} existing rescheduled items for orders {order_ids}{' on machine ' + str(machine_id) if machine_id is not None else ''}")
+                print(
+                    f"Purging {count} existing rescheduled items for orders {order_ids}{' on machine ' + str(machine_id) if machine_id is not None else ''}")
                 query.delete(bulk=True)
                 commit()
     except Exception as e:
@@ -200,7 +202,7 @@ def reschedule_operations_without_logs(
     Reschedule operations that don't have production logs but need to be rescheduled
     due to cascade effects from operations that do have logs.
     Optionally start from a forced anchor time.
-    
+
     Args:
         schedule_df: Original schedule DataFrame
         production_logs: List of operations with production logs
@@ -208,21 +210,21 @@ def reschedule_operations_without_logs(
         machine_ids: Optional set of machine IDs to filter by
         order_ids_allowlist: Optional set of order IDs to filter by
         processed_keys: Set of (operation_id, order_id) that have already been processed
-    
+
     Returns:
         int: Number of operations rescheduled
     """
     try:
         if processed_keys is None:
-            processed_keys = set() # Initialize to empty set if None
+            processed_keys = set()  # Initialize to empty set if None
 
         # Get orders that have production logs
         orders_with_logs = set()
         for log in production_logs:
             orders_with_logs.add(log['order_id'])
-        
+
         print(f"Orders with production logs: {orders_with_logs}")
-        
+
         # Find the latest end time from all rescheduled operations (orders with logs)
         # FIXED: Only consider rescheduled items on the specified machines (if machine_ids is provided)
         latest_reschedule_end_time = None
@@ -231,31 +233,31 @@ def reschedule_operations_without_logs(
             query = select(ri for ri in RescheduledItem if ri.status == 'reschedule')
             if machine_ids:
                 query = query.filter(lambda ri: ri.machine.id in machine_ids)
-            
+
             latest_rescheduled = query.order_by(lambda ri: desc(ri.end_time)).first()
             if latest_rescheduled:
                 latest_reschedule_end_time = latest_rescheduled.end_time
                 machine_context = f" on machines {machine_ids}" if machine_ids else ""
                 print(f"Latest rescheduled operation ends at: {latest_reschedule_end_time}{machine_context}")
-        
+
         # Get orders that need to be rescheduled (not in orders_with_logs)
         orders_to_reschedule = set()
-        already_rescheduled_operations = set() # This tracks items already in DB, not just current run
-        
+        already_rescheduled_operations = set()  # This tracks items already in DB, not just current run
+
         # Get operations that have already been rescheduled to avoid duplicates
         # FIXED: Only consider operations on the specified machines
         with db_session:
             query = select(ri for ri in RescheduledItem if ri.status == 'reschedule')
             if machine_ids:
                 query = query.filter(lambda ri: ri.machine.id in machine_ids)
-            
+
             existing_rescheduled = query
             for item in existing_rescheduled:
                 already_rescheduled_operations.add(item.operation.id)
-        
+
         machine_context = f" on machines {machine_ids}" if machine_ids else ""
         print(f"Operations already rescheduled{machine_context}: {already_rescheduled_operations}")
-        
+
         # Find orders that need cascade rescheduling
         if schedule_df is not None and not schedule_df.empty:
             for idx, row in schedule_df.iterrows():
@@ -274,9 +276,9 @@ def reschedule_operations_without_logs(
 
                     # Find the operation
                     operation = select(op for op in Operation
-                                     if op.operation_description == operation_name
-                                     and op.machine.id == machine_id
-                                     and op.order.production_order == production_order).first()
+                                       if op.operation_description == operation_name
+                                       and op.machine.id == machine_id
+                                       and op.order.production_order == production_order).first()
 
                     if not operation:
                         continue
@@ -286,10 +288,11 @@ def reschedule_operations_without_logs(
                     # Skip if this order already has production logs
                     if order_id in orders_with_logs:
                         continue
-                    
+
                     # Skip if this operation has already been processed in the current run (via processed_keys)
                     if processed_keys is not None and (operation.id, order_id) in processed_keys:
-                        print(f"Skipping operation {operation.id} (order {order_id}) - already processed in current run")
+                        print(
+                            f"Skipping operation {operation.id} (order {order_id}) - already processed in current run")
                         continue
 
                     # Skip default machines
@@ -307,7 +310,9 @@ def reschedule_operations_without_logs(
             # No schedule_df available → discover candidate orders directly from DB by machine
             with db_session:
                 # 1) Restrict to orders that are ACTIVE in PartScheduleStatus
-                active_pairs = set(select((ps.part_number, ps.production_order) for ps in PartScheduleStatus if ps.status == 'active')[:])
+                active_pairs = set(
+                    select((ps.part_number, ps.production_order) for ps in PartScheduleStatus if ps.status == 'active')[
+                    :])
 
                 # 2) Restrict to orders that exist in initial scheduled items on the target machines
                 scheduled_order_ids = set()
@@ -324,7 +329,7 @@ def reschedule_operations_without_logs(
                 if not scheduled_order_ids:
                     machine_context = f" on machines {machine_ids}" if machine_ids else ""
                     print(f"No active scheduled orders found{machine_context} for cascading")
-                
+
                 # 3) From operations on the machines, include only those whose order is in the active+scheduled set
                 query = select(op for op in Operation if op.order is not None)
                 if machine_ids is not None:
@@ -354,23 +359,23 @@ def reschedule_operations_without_logs(
                     except Exception as e:
                         print(f"Error discovering order for op {getattr(op, 'id', None)}: {e}")
                         continue
-        
+
         print(f"Orders to reschedule: {orders_to_reschedule}")
-        
+
         # Get operations for each order that needs rescheduling
         operations_to_reschedule = []
         for order_id in orders_to_reschedule:
             try:
                 # Get all operations for this order
                 with db_session:
-                    order_operations = select(op for op in Operation 
-                                            if op.order.id == order_id).order_by(lambda op: op.operation_number)[:]
-                    
+                    order_operations = select(op for op in Operation
+                                              if op.order.id == order_id).order_by(lambda op: op.operation_number)[:]
+
                     for operation in order_operations:
                         # Machine filter - only include operations on specified machines
                         if machine_ids is not None and operation.machine.id not in machine_ids:
                             continue
-                            
+
                         # Check if this operation is already completed based on production logs
                         op_completed_qty = 0
                         op_has_logs = False
@@ -379,65 +384,70 @@ def reschedule_operations_without_logs(
                             for log in ProductionLog.select(lambda pl: pl.operation == operation):
                                 if getattr(log, 'quantity_completed', None):
                                     op_completed_qty += int(log.quantity_completed)
-                                if getattr(log, 'end_time', None) and (op_latest_end_time is None or log.end_time > op_latest_end_time):
+                                if getattr(log, 'end_time', None) and (
+                                        op_latest_end_time is None or log.end_time > op_latest_end_time):
                                     op_latest_end_time = log.end_time
                                 op_has_logs = True
-                        
+
                         op_total_qty = getattr(operation.order, 'launched_quantity', 1)
                         op_remaining_qty = max(0, int(op_total_qty) - int(op_completed_qty))
 
                         # If the operation is fully completed, skip it
                         if op_remaining_qty == 0 and op_has_logs:
-                            print(f"Skipping operation {operation.id} ({operation.operation_description}) - fully completed based on logs.")
-                            if processed_keys is not None: # Ensure it's marked as processed
+                            print(
+                                f"Skipping operation {operation.id} ({operation.operation_description}) - fully completed based on logs.")
+                            if processed_keys is not None:  # Ensure it's marked as processed
                                 processed_keys.add((operation.id, order_id))
                             continue
 
                         # Skip if this operation has already been rescheduled in the database
                         if operation.id in already_rescheduled_operations:
-                            print(f"Skipping operation {operation.id} ({operation.operation_description}) - already rescheduled in DB")
+                            print(
+                                f"Skipping operation {operation.id} ({operation.operation_description}) - already rescheduled in DB")
                             continue
-                        
+
                         # Skip if this operation has already been processed in the current run (via processed_keys)
                         if processed_keys is not None and (operation.id, order_id) in processed_keys:
-                            print(f"Skipping operation {operation.id} (order {order_id}) - already processed in current run")
+                            print(
+                                f"Skipping operation {operation.id} (order {order_id}) - already processed in current run")
                             continue
 
                         # Skip default machines
                         if is_default_machine(operation.machine.id):
                             continue
-                        
+
                         # If it's a setup op that has already been implicitly covered by a log/previous cascade
                         # and the operation itself doesn't need rescheduling (e.g. 0 remaining qty)
                         # then we explicitly skip it to avoid creating new setup entries
                         current_op_key = (operation.id, order_id)
-                        if getattr(operation.order, 'launched_quantity', 1) == 1: # Assumes launched_quantity is total_qty for setup
+                        if getattr(operation.order, 'launched_quantity',
+                                   1) == 1:  # Assumes launched_quantity is total_qty for setup
                             if processed_keys is not None and current_op_key in processed_keys:
                                 print(f"Skipping setup operation {operation.id} (order {order_id}) - already processed")
                                 continue
-                            pass # Let cascade logic in dynamic_algorithm handle it
-                        
+                            pass  # Let cascade logic in dynamic_algorithm handle it
+
                         # This operation needs to be rescheduled
                         operations_to_reschedule.append({
                             'operation_id': operation.id,
                             'order_id': order_id,
                             'operation_name': operation.operation_description,
                             'production_order': operation.order.production_order,
-                            'remaining_qty': op_remaining_qty, # Pass calculated remaining quantity
-                            'has_logs': op_has_logs, # Pass if this specific operation has logs
-                            'latest_log_end_time': op_latest_end_time # Pass latest log end time
+                            'remaining_qty': op_remaining_qty,  # Pass calculated remaining quantity
+                            'has_logs': op_has_logs,  # Pass if this specific operation has logs
+                            'latest_log_end_time': op_latest_end_time  # Pass latest log end time
                         })
-                        
+
             except Exception as e:
                 print(f"Error processing order {order_id}: {e}")
                 continue
-        
+
         print(f"Found {len(operations_to_reschedule)} operations to reschedule without logs")
-        
+
         # Reschedule each order (only the first operation, cascade will handle the rest)
         rescheduled_count = 0
         processed_orders = set()  # Track orders processed in this execution
-        
+
         # Group operations by order
         operations_by_order = {}
         for op_info in operations_to_reschedule:
@@ -445,14 +455,14 @@ def reschedule_operations_without_logs(
             if order_id not in operations_by_order:
                 operations_by_order[order_id] = []
             operations_by_order[order_id].append(op_info)
-        
+
         for order_id, order_operations in operations_by_order.items():
             try:
                 # Skip if this order has already been processed
                 if order_id in processed_orders:
                     print(f"Skipping order {order_id} - already processed")
                     continue
-                
+
                 # Check if the *order* itself has been fully processed (all its ops in processed_keys)
                 order_fully_processed = True
                 for op_info in order_operations:
@@ -478,15 +488,17 @@ def reschedule_operations_without_logs(
 
                 # Double-check if this operation has been rescheduled in the database
                 with db_session:
-                    existing = select(ri for ri in RescheduledItem 
-                                    if ri.operation.id == first_operation_to_reschedule['operation_id'] 
-                                    and ri.status == 'reschedule').first()
+                    existing = select(ri for ri in RescheduledItem
+                                      if ri.operation.id == first_operation_to_reschedule['operation_id']
+                                      and ri.status == 'reschedule').first()
                     if existing:
-                        print(f"Skipping order {order_id} - first operation {first_operation_to_reschedule['operation_name']} already rescheduled in DB")
+                        print(
+                            f"Skipping order {order_id} - first operation {first_operation_to_reschedule['operation_name']} already rescheduled in DB")
                         processed_orders.add(order_id)
-                        processed_keys.add((first_operation_to_reschedule['operation_id'], first_operation_to_reschedule['order_id']))
+                        processed_keys.add(
+                            (first_operation_to_reschedule['operation_id'], first_operation_to_reschedule['order_id']))
                         continue
-                
+
                 # Determine starting point for this order
                 cascade_start_time = forced_start_time
                 if cascade_start_time is None:
@@ -503,17 +515,20 @@ def reschedule_operations_without_logs(
                         if schedule_df is not None and not schedule_df.empty:
                             matching_rows = schedule_df[
                                 (schedule_df.get('operation') == first_operation_to_reschedule['operation_name']) &
-                                (schedule_df.get('production_order') == first_operation_to_reschedule['production_order'])
-                            ]
+                                (schedule_df.get('production_order') == first_operation_to_reschedule[
+                                    'production_order'])
+                                ]
                             if not matching_rows.empty:
-                                original_start = matching_rows.iloc[0].get('start_time') or matching_rows.iloc[0].get('Start Time')
+                                original_start = matching_rows.iloc[0].get('start_time') or matching_rows.iloc[0].get(
+                                    'Start Time')
                                 if hasattr(original_start, 'to_pydatetime'):
                                     original_start = original_start.to_pydatetime()
-                        
+
                         if not original_start:
-                            print(f"Could not find original start time for {first_operation_to_reschedule['operation_name']}")
+                            print(
+                                f"Could not find original start time for {first_operation_to_reschedule['operation_name']}")
                             continue
-                        
+
                         cascade_start_time = original_start
                         print(f"Using original start time as fallback: {cascade_start_time}")
 
@@ -525,14 +540,15 @@ def reschedule_operations_without_logs(
                 order_db = Order.get(id=order_id)
                 if not order_db:
                     continue
-                
+
                 # Use the remaining_qty determined for this specific operation
                 remaining_qty_for_op = first_operation_to_reschedule['remaining_qty']
                 has_logs_for_op = first_operation_to_reschedule['has_logs']
-                
-                print(f"Rescheduling order {order_id} starting with {first_operation_to_reschedule['operation_name']} with qty {remaining_qty_for_op}")
+
+                print(
+                    f"Rescheduling order {order_id} starting with {first_operation_to_reschedule['operation_name']} with qty {remaining_qty_for_op}")
                 print(f"  Starting from: {cascade_start_time}")
-                
+
                 # Reschedule the first unprocessed operation and cascade to all dependent operations
                 # Pass processed_keys to cascade function to ensure it also marks operations
                 ok = reschedule_operation_with_cascade(
@@ -540,7 +556,7 @@ def reschedule_operations_without_logs(
                     order_id=order_id,
                     remaining_qty=remaining_qty_for_op,
                     production_log_end_time=cascade_start_time,
-                    has_production_logs=has_logs_for_op # Pass if this specific operation has logs
+                    has_production_logs=has_logs_for_op  # Pass if this specific operation has logs
                 )
 
                 if ok:
@@ -550,31 +566,31 @@ def reschedule_operations_without_logs(
                     with db_session:
                         all_ops_for_order = select(op for op in Operation if op.order.id == order_id)[:]
                         for op_item in all_ops_for_order:
-                            if processed_keys is not None: # Add this check
-                                processed_keys.add((op_item.id, order_id)) # Add all ops of this order
+                            if processed_keys is not None:  # Add this check
+                                processed_keys.add((op_item.id, order_id))  # Add all ops of this order
 
                     print(f"  Successfully rescheduled order {order_id}")
-                    
+
                     # Update the latest reschedule end time for next orders (machine-specific)
                     with db_session:
-                        query = select(ri for ri in RescheduledItem 
-                                     if ri.status == 'reschedule' and ri.order.id == order_id)
+                        query = select(ri for ri in RescheduledItem
+                                       if ri.status == 'reschedule' and ri.order.id == order_id)
                         if machine_ids:
                             query = query.filter(lambda ri: ri.machine.id in machine_ids)
-                        
+
                         latest_rescheduled_item = query.order_by(lambda ri: desc(ri.end_time)).first()
                         if latest_rescheduled_item:
                             latest_reschedule_end_time = latest_rescheduled_item.end_time
                             print(f"  Updated latest reschedule end time: {latest_reschedule_end_time}")
                 else:
                     print(f"  Failed to reschedule order {order_id}")
-                    
+
             except Exception as e:
                 print(f"Error rescheduling order {order_id}: {e}")
                 continue
-        
+
         return rescheduled_count
-        
+
     except Exception as e:
         print(f"Error in reschedule_operations_without_logs: {e}")
         return 0
@@ -600,7 +616,8 @@ def store_schedule_in_rescheduled_items(schedule_df: pd.DataFrame) -> int:
                     machine_id = row.get('machine_id') or row.get('Machine ID')
 
                     if not all([production_order, operation_name, machine_id]):
-                        print(f"Missing required fields: production_order={production_order}, operation_name={operation_name}, machine_id={machine_id}")
+                        print(
+                            f"Missing required fields: production_order={production_order}, operation_name={operation_name}, machine_id={machine_id}")
                         continue
 
                     # Find operation by name, machine_id and production_order
@@ -610,7 +627,8 @@ def store_schedule_in_rescheduled_items(schedule_df: pd.DataFrame) -> int:
                                        and op.order.production_order == production_order).first()
 
                     if not operation:
-                        print(f"Could not find operation: name={operation_name}, machine_id={machine_id}, production_order={production_order}")
+                        print(
+                            f"Could not find operation: name={operation_name}, machine_id={machine_id}, production_order={production_order}")
                         continue
 
                     # Get related entities
@@ -618,7 +636,8 @@ def store_schedule_in_rescheduled_items(schedule_df: pd.DataFrame) -> int:
                     machine = operation.machine
 
                     if not all([order, operation, machine]):
-                        print(f"Missing entities for row {idx}: order={order}, operation={operation}, machine={machine}")
+                        print(
+                            f"Missing entities for row {idx}: order={order}, operation={operation}, machine={machine}")
                         continue
 
                     # Get quantity and times
@@ -755,7 +774,7 @@ async def run_dynamic_schedule(request: DynamicScheduleRequest = None):
         else:
             successful_reschedules, failed_reschedules, processed_keys = process_reschedule_triggers(production_logs)
         print(f"Rescheduling complete: {successful_reschedules} successful, {failed_reschedules} failed")
-        
+
         # REMOVED: Global cascade that was causing cross-machine dependencies
         # The machine-specific cascading is already handled properly inside process_reschedule_triggers()
         print("Machine-specific cascading completed within process_reschedule_triggers - no global cascade needed")
@@ -781,7 +800,7 @@ async def run_dynamic_schedule(request: DynamicScheduleRequest = None):
             message = f"Dynamic scheduling completed successfully. {rescheduled_items_count} items scheduled, {successful_reschedules} items copied to rescheduled (no production logs found)."
         else:
             message = f"Dynamic scheduling completed successfully. {rescheduled_items_count} items scheduled, {successful_reschedules} operations rescheduled from production logs."
-        
+
         return DynamicScheduleResponse(
             message=message,
             rescheduled_items_count=rescheduled_items_count,
@@ -804,8 +823,8 @@ async def get_rescheduled_items(
         limit: int = Query(100, ge=1, le=1000, description="Number of items to return")
 ):
     """Get rescheduled items with optional filtering
-    
-    Note: 
+
+    Note:
     - 'scheduled' status = original scheduled items (setup and cycle)
     - 'reschedule' status = newly rescheduled items (cycle only, separate rows)
     """
@@ -867,7 +886,7 @@ async def get_scheduled_items(
         limit: int = Query(100, ge=1, le=1000, description="Number of items to return")
 ):
     """Get only the original scheduled items (setup and cycle operations)
-    
+
     These are the initial scheduled items that are never overwritten.
     Use /rescheduled-items?status=scheduled for the same result.
     """
@@ -958,8 +977,10 @@ def _minutes_str(delta: timedelta) -> str:
 def _build_combined_response_from_db() -> LegacyCombinedScheduleResponse:
     # Scheduled and rescheduled items
     with db_session:
-        scheduled_items = select(r for r in RescheduledItem if r.status == 'scheduled').order_by(lambda r: desc(r.start_time))[:]
-        rescheduled_items = select(r for r in RescheduledItem if r.status == 'reschedule').order_by(lambda r: desc(r.start_time))[:]
+        scheduled_items = select(r for r in RescheduledItem if r.status == 'scheduled').order_by(
+            lambda r: desc(r.start_time))[:]
+        rescheduled_items = select(r for r in RescheduledItem if r.status == 'reschedule').order_by(
+            lambda r: desc(r.start_time))[:]
 
         # Compute overall time window across all items
         all_items = scheduled_items + rescheduled_items
@@ -989,7 +1010,8 @@ def _build_combined_response_from_db() -> LegacyCombinedScheduleResponse:
                 if item.type == 'setup':
                     # Setup operation - calculate actual vs planned setup time
                     try:
-                        setup_minutes_total = int(float(operation.setup_time) * 60.0) if hasattr(operation, 'setup_time') and operation.setup_time else 0
+                        setup_minutes_total = int(float(operation.setup_time) * 60.0) if hasattr(operation,
+                                                                                                 'setup_time') and operation.setup_time else 0
                         actual_minutes = max(0, int((item.end_time - item.start_time).total_seconds() // 60))
                         quantity_str = f"Setup({actual_minutes}/{setup_minutes_total}min)"
                     except Exception:
@@ -1058,7 +1080,8 @@ def _build_combined_response_from_db() -> LegacyCombinedScheduleResponse:
                     total_completed += qty_c
                     total_rejected += qty_r
                     order = getattr(getattr(log, 'operation', None), 'order', None)
-                    machine = getattr(getattr(getattr(log, 'schedule_version', None), 'schedule_item', None), 'machine', None)
+                    machine = getattr(getattr(getattr(log, 'schedule_version', None), 'schedule_item', None), 'machine',
+                                      None)
                     # If no machine from schedule_version, try getting from operation directly
                     if not machine:
                         machine = getattr(getattr(log, 'operation', None), 'machine', None)
@@ -1066,7 +1089,8 @@ def _build_combined_response_from_db() -> LegacyCombinedScheduleResponse:
                     if machine:
                         wc_code = getattr(getattr(machine, 'work_center', None), 'code', None)
                         machine_make = getattr(machine, 'make', getattr(machine, 'machine_name', None))
-                        machine_name = f"{wc_code}-{machine_make}" if wc_code and machine_make else (machine_make or None)
+                        machine_name = f"{wc_code}-{machine_make}" if wc_code and machine_make else (
+                                    machine_make or None)
                     production_logs_resp.append(ProductionLogResponse(
                         id=int(getattr(log, 'id', 0)),
                         operator_id=int(getattr(getattr(log, 'operator', None), 'id', 0) or 0),
@@ -1076,7 +1100,8 @@ def _build_combined_response_from_db() -> LegacyCombinedScheduleResponse:
                         quantity_rejected=qty_r,
                         part_number=str(getattr(order, 'part_number', '')) if order else None,
                         production_order=str(getattr(order, 'production_order', '')) if order else None,
-                        operation_description=str(getattr(getattr(log, 'operation', None), 'operation_description', '')),
+                        operation_description=str(
+                            getattr(getattr(log, 'operation', None), 'operation_description', '')),
                         machine_name=machine_name,
                         notes=str(getattr(log, 'notes', '') or ''),
                         version_number=int(getattr(getattr(log, 'schedule_version', None), 'version_number', 0) or 0)
@@ -1181,17 +1206,18 @@ async def planned_vs_reschedule():
         clear_rescheduled_items()
         _ = store_schedule_in_rescheduled_items(schedule_df)
         production_logs_raw = get_production_logs_for_rescheduling()
-        
+
         if len(production_logs_raw) == 0:
             print("No production logs found - copying scheduled items to rescheduled items with same timestamps")
             copy_scheduled_to_rescheduled_items()
         else:
-            successful_reschedules, failed_reschedules, processed_keys_from_triggers = process_reschedule_triggers(production_logs_raw)
-            
+            successful_reschedules, failed_reschedules, processed_keys_from_triggers = process_reschedule_triggers(
+                production_logs_raw)
+
             # REMOVED: Global cascade that was causing cross-machine dependencies
             # The machine-specific cascading is already handled properly inside process_reschedule_triggers()
             print("Machine-specific cascading completed within process_reschedule_triggers - no global cascade needed")
-            
+
     except HTTPException:
         raise
     except Exception as e:
